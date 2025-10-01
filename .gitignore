@@ -1,3 +1,6 @@
 .next
 node_modules
 /skill-test-1*.json
+.vercel
+.wrangler
+tsconfig.tsbuildinfo

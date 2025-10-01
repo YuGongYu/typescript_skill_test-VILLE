@@ -1,8 +1,8 @@
-import "../styles.scss";
+import "../styles/globals.css";
 
-// This _app.tsx is here just to enable the SCSS stylesheets
+type AppPropsLocal = { Component: any; pageProps: Record<string, unknown> };
 
-export default function AppWithScss({ Component, pageProps }) {
+export default function App({ Component, pageProps }: AppPropsLocal) {
   return <Component {...pageProps} />;
 }
 
