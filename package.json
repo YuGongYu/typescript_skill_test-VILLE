@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "next",
     "build": "next build",
+    "pages:build": "npx @cloudflare/next-on-pages",
+    "pages:deploy": "npm run pages:build && wrangler pages deploy",
+    "pages:dev": "npx @cloudflare/next-on-pages --watch",
     "start": "next start -p 8080"
   },
   "repository": {
@@ -21,8 +24,7 @@
   "dependencies": {
     "next": "^15.5.2",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "zod": "^4.1.11"
+    "react-dom": "^19.1.1"
   },
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.13.16",

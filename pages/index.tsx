@@ -1,6 +1,5 @@
-import type { Company, Answer } from "../lib/schemas";
 import { useEffect, useMemo, useState } from "react";
-import type { ScoredCompany, SentimentPoint, SectorStat, CompanyChange, MostRated, SeriesBounds } from "../lib/types";
+import type { Company, Answer, ScoredCompany, SentimentPoint, SectorStat, CompanyChange, MostRated, SeriesBounds } from "../lib/types";
 import DateRangeControls from "../components/DateRangeControls";
 import OverallSentimentChart from "../components/OverallSentimentChart";
 import SectorHeatmap from "../components/SectorHeatmap";
@@ -8,115 +7,98 @@ import TopMovers from "../components/TopMovers";
 import TopCompaniesTable from "../components/TopCompaniesTable";
 import MostRatedChart from "../components/MostRatedChart";
 import Link from "next/link";
-
-function buildDailySentimentSeries(answers: Answer[]): SentimentPoint[] {
-  const sums: Record<string, { total: number; count: number }> = {};
-  for (const a of answers) {
-    if (a.skip) continue;
-    const d = new Date(a.created);
-    const key = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
-      .toISOString()
-      .slice(0, 10);
-    if (!sums[key]) sums[key] = { total: 0, count: 0 };
-    sums[key].total += a.value;
-    sums[key].count += 1;
-  }
-  const points: SentimentPoint[] = Object.keys(sums)
-    .map((k) => {
-      const bucket = sums[k]!;
-      return { date: new Date(k), avg: bucket.total / bucket.count };
-    })
-    .sort((a, b) => +a.date - +b.date);
-  return points;
-}
+import type { GetStaticProps } from "next";
+import {
+  buildDailySentimentSeries,
+  deriveCompaniesFromAnswers,
+  computeTopCompanies,
+  getSectorNameForCompany,
+} from "../lib/utils";
 
 // Optional mapping from company.tid to human-friendly sector names.
 // If a tid is not present in this map, it will be labeled as "Group {tid}".
-const sectorByTid: Record<number, string> = {
-};
+const sectorByTid: Record<number, string> = {};
 
-function getSectorNameForCompany(company: Company, dynamicMap: Record<number, string>): { key: string; name: string } {
-  const tid = company.tid;
-  const name = dynamicMap[tid] ?? sectorByTid[tid] ?? `Group ${tid}`;
-  return { key: String(tid), name };
+interface HomeProps {
+  companies: Company[];
+  allAnswers: Answer[];
+  sentimentSeriesData: Array<{ date: string; avg: number }>;
+  topCompanies: ScoredCompany[];
+  initialStartDate: string;
+  initialEndDate: string;
 }
 
-const Home = () => {
-  const [companies, setCompanies] = useState<Company[] | undefined>(undefined);
-  const [topCompanies, setTopCompanies] = useState<ScoredCompany[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | undefined>(undefined);
-  const [sentimentSeries, setSentimentSeries] = useState<SentimentPoint[]>([]);
-  const [smoothing, setSmoothing] = useState<number>(7);
-  const [startDate, setStartDate] = useState<string | undefined>(undefined);
-  const [endDate, setEndDate] = useState<string | undefined>(undefined);
-  const [allAnswers, setAllAnswers] = useState<Answer[]>([]);
-  const [windowDays, setWindowDays] = useState<number>(7);
-  const [sectorNameByTid, setSectorNameByTid] = useState<Record<number, string>>({});
+// Static Site Generation - runs at build time
+export const getStaticProps: GetStaticProps<HomeProps> = async () => {
+  try {
+    const dataUrl = process.env.NEXT_PUBLIC_ANSWERS_DATA_URL || 
+      'https://pub-aabfd900efaf4039995d56f686bb2c79.r2.dev/data.json.gz';
+    
+    const res = await fetch(dataUrl);
+    if (!res.ok) throw new Error("Failed to load dataset");
+    
+    const allAnswers: Answer[] = await res.json();
+    const companies = deriveCompaniesFromAnswers(allAnswers);
+    const sentimentSeries = buildDailySentimentSeries(allAnswers);
+    const topCompanies = computeTopCompanies(companies, allAnswers);
 
-  useEffect(() => {
-    async function fetchOverview() {
-      try {
-        // Fetch directly from R2 - much faster and avoids Edge function timeouts
-        const dataUrl = process.env.NEXT_PUBLIC_ANSWERS_DATA_URL || 'https://pub-aabfd900efaf4039995d56f686bb2c79.r2.dev/data.json.gz';
-        const res = await fetch(dataUrl);
-        if (!res.ok) throw new Error("Failed to load dataset");
-        const loadedAnswers: Answer[] = await res.json();
-        setAllAnswers(loadedAnswers);
-
-        // Derive companies from answers (unique by isin)
-        const seen = new Set<string>();
-        const derivedCompanies: Company[] = [];
-        for (const a of loadedAnswers) {
-          const isin = a.company.isin;
-          if (seen.has(isin)) continue;
-          seen.add(isin);
-          derivedCompanies.push({ ...a.company });
-        }
-        setCompanies(derivedCompanies);
-
-        const series = buildDailySentimentSeries(loadedAnswers);
-        setSentimentSeries(series);
-
-        // Initialize default date range to last 180 days
-        const first = series[0]?.date;
-        const last = series[series.length - 1]?.date;
-        if (first && last && (!startDate || !endDate)) {
-          const defaultStart = new Date(+last - 1000 * 60 * 60 * 24 * 180);
-          const boundedStart = defaultStart < first ? first : defaultStart;
-          setStartDate(boundedStart.toISOString().slice(0, 10));
-          setEndDate(last.toISOString().slice(0, 10));
-        }
-
-        // Compute simple scores client-side for a small sample (last 6 months)
-        const sampleCompanies = derivedCompanies.slice(0, 5);
-        const msMonth = 30 * 24 * 60 * 60 * 1000;
-        const end = new Date();
-        const start = new Date(+end - 6 * msMonth);
-        const scores: ScoredCompany[] = sampleCompanies
-          .map((c) => {
-            const arr = loadedAnswers
-              .filter((a) => a.company.isin === c.isin)
-              .filter((a) => !a.skip)
-              .filter((a) => {
-                const t = new Date(a.created);
-                return t >= start && t < end;
-              });
-            const score = arr.length > 0 ? arr.reduce((s, a) => s + a.value, 0) / arr.length : undefined;
-            return { company: c, score } as ScoredCompany;
-          })
-          .filter((s): s is ScoredCompany => typeof s.score === 'number' && !Number.isNaN(s.score));
-        scores.sort((a, b) => b.score - a.score);
-        setTopCompanies(scores);
-      } catch (_e) {
-        setError("Failed to load market overview. Please try again.");
-      } finally {
-        setLoading(false);
-      }
+    // Initialize default date range to last 180 days
+    const first = sentimentSeries[0]?.date;
+    const last = sentimentSeries[sentimentSeries.length - 1]?.date;
+    let initialStartDate = '';
+    let initialEndDate = '';
+    
+    if (first && last) {
+      const defaultStart = new Date(+last - 1000 * 60 * 60 * 24 * 180);
+      const boundedStart = defaultStart < first ? first : defaultStart;
+      initialStartDate = boundedStart.toISOString().slice(0, 10);
+      initialEndDate = last.toISOString().slice(0, 10);
     }
 
-    fetchOverview();
-  }, []);
+    // Serialize dates to strings for JSON
+    const sentimentSeriesData = sentimentSeries.map(p => ({
+      date: p.date.toISOString(),
+      avg: p.avg,
+    }));
+
+    return {
+      props: {
+        companies,
+        allAnswers,
+        sentimentSeriesData,
+        topCompanies,
+        initialStartDate,
+        initialEndDate,
+      },
+    };
+  } catch (error) {
+    console.error('Failed to fetch data:', error);
+    // Return empty data on error - page will still render
+    return {
+      props: {
+        companies: [],
+        allAnswers: [],
+        sentimentSeriesData: [],
+        topCompanies: [],
+        initialStartDate: '',
+        initialEndDate: '',
+      },
+    };
+  }
+};
+
+const Home = ({ companies, allAnswers, sentimentSeriesData, topCompanies, initialStartDate, initialEndDate }: HomeProps) => {
+  // Convert serialized date strings back to Date objects
+  const sentimentSeries: SentimentPoint[] = sentimentSeriesData.map(p => ({
+    date: new Date(p.date),
+    avg: p.avg,
+  }));
+
+  const [smoothing, setSmoothing] = useState<number>(7);
+  const [startDate, setStartDate] = useState<string | undefined>(initialStartDate);
+  const [endDate, setEndDate] = useState<string | undefined>(initialEndDate);
+  const [windowDays, setWindowDays] = useState<number>(7);
+  const [sectorNameByTid, setSectorNameByTid] = useState<Record<number, string>>({});
 
   useEffect(() => {
     // Load optional sector name mapping from public/sectorNames.json
@@ -158,7 +140,7 @@ const Home = () => {
       const t = new Date(a.created);
       if (from && t < from) continue;
       if (to && t > to) continue;
-      const { key, name } = getSectorNameForCompany(a.company, sectorNameByTid);
+      const { key, name } = getSectorNameForCompany(a.company, sectorNameByTid, sectorByTid);
       if (!sums[key]) sums[key] = { name, total: 0, count: 0 };
       sums[key].total += a.value;
       sums[key].count += 1;
@@ -284,22 +266,7 @@ const Home = () => {
           <p className="text-inderes-gray text-lg">Sentiment and activity across tracked companies.</p>
         </div>
 
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="relative">
-              {/* Outer spinning ring */}
-              <div className="w-16 h-16 border-4 border-inderes-border-gray border-t-inderes-blue rounded-full animate-spin"></div>
-              {/* Inner pulsing dot */}
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-inderes-blue rounded-full animate-pulse"></div>
-            </div>
-            <p className="mt-6 text-inderes-gray font-medium">Loading overview…</p>
-          </div>
-        )}
-        {error && <p className="text-inderes-red bg-inderes-red-bg p-4 rounded-lg">{error}</p>}
-
-      {!loading && !error && (
-        <>
-          {companies && companies.length > 0 && (
+        {companies.length > 0 && (
             <section className="bg-inderes-lavender rounded-lg p-6 mb-6">
               <div className="flex items-center justify-between mb-5">
                 <h2 className="mb-0">Browse Companies</h2>
@@ -374,8 +341,6 @@ const Home = () => {
           {mostRated.length > 0 && (
             <MostRatedChart items={mostRated} />
           )}
-        </>
-      )}
       </div>
     </div>
   );

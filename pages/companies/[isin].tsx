@@ -1,71 +1,78 @@
-import { useRouter } from "next/router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Answer, Company } from "../../lib/schemas";
-import type { SentimentPoint, AttributeStat } from "../../lib/types";
+import type { Answer, Company, SentimentPoint, AttributeStat } from "../../lib/types";
 import AttributeRadarChart from "../../components/AttributeRadarChart";
 import HistoricalTrendsChart from "../../components/HistoricalTrendsChart";
+import type { GetStaticProps, GetStaticPaths } from "next";
+import { buildDailySentimentSeries } from "../../lib/utils";
 
-function buildDailySentimentSeries(answers: Answer[]): SentimentPoint[] {
-  const bucketByDay: Record<string, { total: number; count: number }> = {};
-  for (const a of answers) {
-    if (a.skip) continue;
-    const d = new Date(a.created);
-    const key = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
-      .toISOString()
-      .slice(0, 10);
-    if (!bucketByDay[key]) bucketByDay[key] = { total: 0, count: 0 };
-    bucketByDay[key].total += a.value;
-    bucketByDay[key].count += 1;
-  }
-  const points: SentimentPoint[] = Object.keys(bucketByDay)
-    .map((k) => {
-      const b = bucketByDay[k]!;
-      return { date: new Date(k), avg: b.total / b.count };
-    })
-    .sort((a, b) => +a.date - +b.date);
-  return points;
+interface CompanyProfileProps {
+  company: Company;
+  answers: Answer[];
+  isin: string;
 }
 
-export default function CompanyProfilePage() {
-  const router = useRouter();
-  const { isin } = router.query as { isin?: string };
-
-  const [company, setCompany] = useState<Company | undefined>(undefined);
-  const [answers, setAnswers] = useState<Answer[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | undefined>(undefined);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError(undefined);
-      try {
-        if (!isin) return;
-        // Fetch directly from R2 and filter client-side - avoids Edge function timeouts
-        const dataUrl = process.env.NEXT_PUBLIC_ANSWERS_DATA_URL || 'https://pub-aabfd900efaf4039995d56f686bb2c79.r2.dev/data.json.gz';
-        const res = await fetch(dataUrl);
-        if (cancelled) return;
-        if (!res.ok) throw new Error('Failed to fetch');
-        const allAnswers: Answer[] = await res.json();
-        // Filter by ISIN client-side
-        const list = allAnswers.filter(a => a.company.isin === isin);
-        setAnswers(list);
-        const first = list[0]?.company;
-        if (first) setCompany(first);
-      } catch (_e) {
-        if (!cancelled) setError('Failed to load company answers.');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
+// Generate all company pages at build time
+export const getStaticPaths: GetStaticPaths = async () => {
+  try {
+    const dataUrl = process.env.NEXT_PUBLIC_ANSWERS_DATA_URL || 
+      'https://pub-aabfd900efaf4039995d56f686bb2c79.r2.dev/data.json.gz';
+    
+    const res = await fetch(dataUrl);
+    if (!res.ok) throw new Error('Failed to fetch');
+    
+    const allAnswers: Answer[] = await res.json();
+    
+    // Get unique ISINs
+    const isins = [...new Set(allAnswers.map(a => a.company.isin))];
+    
+    return {
+      paths: isins.map(isin => ({ params: { isin } })),
+      fallback: false, // No fallback needed - all pages generated at build
     };
-  }, [isin]);
+  } catch (error) {
+    console.error('Failed to fetch data for paths:', error);
+    return {
+      paths: [],
+      fallback: false,
+    };
+  }
+};
+
+// Fetch data for specific company at build time
+export const getStaticProps: GetStaticProps<CompanyProfileProps> = async (context) => {
+  const isin = context.params?.isin as string;
+  
+  try {
+    const dataUrl = process.env.NEXT_PUBLIC_ANSWERS_DATA_URL || 
+      'https://pub-aabfd900efaf4039995d56f686bb2c79.r2.dev/data.json.gz';
+    
+    const res = await fetch(dataUrl);
+    if (!res.ok) throw new Error('Failed to fetch');
+    
+    const allAnswers: Answer[] = await res.json();
+    const answers = allAnswers.filter(a => a.company.isin === isin);
+    const company = answers[0]?.company;
+    
+    if (!company) {
+      return { notFound: true };
+    }
+    
+    return {
+      props: {
+        company,
+        answers,
+        isin,
+      },
+    };
+  } catch (error) {
+    console.error(`Failed to fetch data for company ${isin}:`, error);
+    return { notFound: true };
+  }
+};
+
+export default function CompanyProfilePage({ company, answers, isin }: CompanyProfileProps) {
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   const attributeStats: AttributeStat[] = useMemo(() => {
     if (!answers || answers.length === 0) return [] as AttributeStat[];
@@ -147,7 +154,7 @@ export default function CompanyProfilePage() {
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-8">
           <div className="flex items-center justify-between mb-3">
-            <h1 className="text-4xl font-bold uppercase">{company?.title ?? (isin ? `Company ${isin}` : "Company")}</h1>
+            <h1 className="text-4xl font-bold uppercase">{company.title}</h1>
             <Link href="/">
               <button className="btn flex items-center gap-2 text-sm">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -157,20 +164,8 @@ export default function CompanyProfilePage() {
               </button>
             </Link>
           </div>
-          <p className="text-inderes-gray text-lg">ISIN: {isin ?? "-"}</p>
+          <p className="text-inderes-gray text-lg">ISIN: {isin}</p>
         </div>
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="relative">
-              {/* Outer spinning ring */}
-              <div className="w-16 h-16 border-4 border-inderes-border-gray border-t-inderes-blue rounded-full animate-spin"></div>
-              {/* Inner pulsing dot */}
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-inderes-blue rounded-full animate-pulse"></div>
-            </div>
-            <p className="mt-6 text-inderes-gray font-medium">Loading company data…</p>
-          </div>
-        )}
-        {error && <p className="text-inderes-red bg-inderes-red-bg p-4 rounded-lg">{error}</p>}
         {attributeStats.length > 0 && (
           <AttributeRadarChart
             items={attributeStats}

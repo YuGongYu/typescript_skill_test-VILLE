@@ -1,85 +1,72 @@
 # Sentiment Dashboard (Next.js + Cloudflare Pages)
 
-A small analytics app that visualizes market sentiment for Finnish large-cap companies. Data is fetched directly from Cloudflare R2 storage, with all processing and filtering done client-side for optimal performance.
+A high-performance analytics app that visualizes market sentiment for Finnish large-cap companies. Built with **Static Site Generation (SSG)** - all pages pre-rendered at build time with data from Cloudflare R2.
 
-## What it does
+## Features
 
-- Visualizes overall daily sentiment as a time series
-- Shows sector-level averages as a heatmap
-- Highlights top risers/fallers over a selectable window
-- Lists top-scoring companies and most-rated companies
-- Lets you browse to a company page for a focused view
+- Daily sentiment time series with customizable smoothing
+- Sector-level heatmap and top movers analysis
+- Company detail pages with attribute breakdowns
+- Interactive client-side filtering and date range selection
 
 ## Tech stack
 
-- Next.js 15, React 19, TypeScript, Tailwind
-- Data fetched directly from Cloudflare R2 (bypasses Edge function limits)
-- Zod for schema validation and safer parsing
-- Deployed to Cloudflare Pages via `@cloudflare/next-on-pages`
-
-## Live deployment
-
-- Platform: Cloudflare Pages (Workers runtime)
-- URL: https://inderes.pages.dev
+- **Next.js 15** with Static Site Generation
+- **React 19**, TypeScript, Tailwind CSS
+- Deployed to **Cloudflare Pages** via `@cloudflare/next-on-pages`
 
 ## Architecture
 
-This app leverages Cloudflare's infrastructure for optimal performance:
+**SSG Approach:**
+- Data fetched once from Cloudflare R2 during build
+- 7 pages pre-rendered (home + 6 company pages)
+- All data embedded in HTML - no API calls at runtime
+- Interactive filters run client-side
 
-**Cloudflare Pages** hosts the static Next.js app:
-- HTML, CSS, and JavaScript served from Cloudflare's global CDN
-- Fast delivery from 300+ edge locations worldwide
-- Built with `@cloudflare/next-on-pages` for Edge compatibility
+**Benefits:**
+- ⚡ Instant page loads from global CDN
+- 💰 Cost-effective (no compute per request)
+- 🚀 Infinitely scalable (pure static files)
 
-**Cloudflare R2** provides data storage:
-- Sentiment data stored as a JSON file in R2 (S3-compatible object storage)
-- Fetched directly by the browser, bypassing Edge function CPU/memory limits
-- Automatically cached by browsers and CDN for faster subsequent loads
-- No API endpoints needed — simpler architecture, better performance
+## Quick start
 
-**Why direct R2 fetching?**
-- Avoids Edge function timeout errors (503) with large datasets
-- Reduces Cloudflare Workers invocations (cost savings)
-- Leverages browser and CDN caching more effectively
-- All data processing (filtering, aggregation) happens client-side in React
+```bash
+npm install
+npm run dev
+```
 
-## Quick start (local development)
-
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-2. Run the app:
-   ```bash
-   npm run dev
-   ```
-3. Open `http://localhost:3000`
+Open `http://localhost:3000`
 
 ## Environment Variables
 
-The app reads data from Cloudflare R2. Configure the data URL:
+Set `NEXT_PUBLIC_ANSWERS_DATA_URL` to your R2 data source:
 
 ```bash
 NEXT_PUBLIC_ANSWERS_DATA_URL=https://pub-aabfd900efaf4039995d56f686bb2c79.r2.dev/data.json.gz
 ```
 
-This is set in `wrangler.toml` for production deployments. For local development, you can optionally create a `.env.local` file.
+For local dev, create `.env.local`. For production, set in `wrangler.toml` or Cloudflare dashboard.
 
-## Project scripts
+## Scripts
 
-- `npm run dev` — start Next.js dev server
-- `npm run build` — build the app
-- `npm run start` — run the built app locally (port 8080)
+**Development:**
+- `npm run dev` - Next.js dev server
+- `npm run build` - Build with SSG
 
-## Deploying to Cloudflare Pages
+**Cloudflare Pages:**
+- `npm run pages:build` - Build for Cloudflare
+- `npm run pages:deploy` - Build and deploy
 
-Minimal flow using Next‑on‑Pages and Wrangler:
+## Deployment
 
-1. Build
-   ```bash
-   npx @cloudflare/next-on-pages
-   ```
-2. Deploy
-   ```bash
-   npx wrangler pages deploy
-   ```
+### Via CLI:
+```bash
+npm run pages:deploy
+```
+
+### Cloudflare Dashboard:
+- **Build command:** `npm run pages:build`
+- **Output directory:** `.vercel/output/static`
+- **Environment variable:** `NEXT_PUBLIC_ANSWERS_DATA_URL`
+
+**Live URL:** https://inderes.pages.dev

@@ -1,7 +1,34 @@
-import type { Company } from "./schemas";
+// Base domain types
+export interface Company {
+  standby?: boolean;
+  title: string;
+  tid: number;
+  isin: string;
+  id: number;
+}
+
+export interface Question {
+  fullText: string;
+  shortText: string;
+  tag: string;
+  id: string;
+  isPublic?: boolean;
+  isActive?: boolean;
+  translations?: Record<string, Partial<Question>>;
+}
+
+export interface Answer {
+  value: number;
+  source: string;
+  created: string;
+  skip: boolean;
+  id: string;
+  user: string;
+  company: Company;
+  question: Question;
+}
 
 // UI/Component-specific types derived from base domain models
-
 export type ScoredCompany = { company: Company; score: number };
 export type SentimentPoint = { date: Date; avg: number };
 export type SectorStat = { key: string; name: string; avg: number; count: number };
