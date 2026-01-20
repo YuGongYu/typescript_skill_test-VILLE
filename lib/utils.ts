@@ -1,6 +1,78 @@
 import type { Answer, Company, SentimentPoint, ScoredCompany } from "./types";
 
 /**
+ * Cached fetch for data.json during build time
+ * This prevents downloading the same 24MB file multiple times during SSG
+ */
+let cachedData: Answer[] | null = null;
+let fetchPromise: Promise<Answer[]> | null = null;
+
+export async function fetchAnswersData(): Promise<Answer[]> {
+  // Return cached data if available
+  if (cachedData !== null) {
+    return cachedData;
+  }
+
+  // Return existing promise if fetch is in progress
+  if (fetchPromise !== null) {
+    return fetchPromise;
+  }
+
+  // Start new fetch with compression support
+  fetchPromise = (async () => {
+    const dataUrl = process.env.NEXT_PUBLIC_ANSWERS_DATA_URL || 
+      'https://pub-143cbf8a3b5c4841983236dc7b36dab8.r2.dev/data.json';
+    
+    const res = await fetch(dataUrl, {
+      headers: {
+        'Accept-Encoding': 'gzip, br, deflate', // Request compressed response
+      },
+    });
+    
+    if (!res.ok) {
+      throw new Error(`Failed to load dataset: ${res.status} ${res.statusText}`);
+    }
+    
+    // Log transfer info during build (only log if compression is missing)
+    const contentEncoding = res.headers.get('content-encoding');
+    const contentLength = res.headers.get('content-length');
+    if (!contentEncoding && contentLength) {
+      console.log(`⚠ Downloaded data.json uncompressed (${(parseInt(contentLength) / 1024 / 1024).toFixed(2)} MB) - consider enabling compression`);
+    }
+    
+    // Get response text first to handle potential decompression issues
+    const text = await res.text();
+    if (!text || text.length === 0) {
+      throw new Error('Received empty response from data.json');
+    }
+    
+    // Parse JSON with better error handling
+    let allAnswers: Answer[];
+    try {
+      allAnswers = JSON.parse(text);
+    } catch (parseError) {
+      console.error('Failed to parse JSON response. Content-Encoding:', contentEncoding);
+      console.error('Response length:', text.length);
+      console.error('First 200 chars:', text.substring(0, 200));
+      throw new Error(`Failed to parse JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+    }
+    
+    // Cache the result
+    cachedData = allAnswers;
+    
+    return allAnswers;
+  })();
+
+  try {
+    return await fetchPromise;
+  } catch (error) {
+    // Reset promise on error so retry is possible
+    fetchPromise = null;
+    throw error;
+  }
+}
+
+/**
  * Build daily sentiment series from answers by averaging values per day
  */
 export function buildDailySentimentSeries(answers: Answer[]): SentimentPoint[] {

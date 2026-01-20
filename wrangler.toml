@@ -1,10 +1,8 @@
 name = "inderes"
 compatibility_date = "2025-09-30"
-compatibility_flags = ["nodejs_compat"]
 
-# Cloudflare Pages: location of the static output produced by Next-on-Pages
-pages_build_output_dir = ".vercel/output/static"
-
+# Cloudflare Pages: static output from Next.js export
+pages_build_output_dir = "out"
 [vars]
 NEXT_ON_PAGES = "1"
-NEXT_PUBLIC_ANSWERS_DATA_URL = "https://pub-143cbf8a3b5c4841983236dc7b36dab8.r2.dev/data.json.gz"
+NEXT_PUBLIC_ANSWERS_DATA_URL = "https://pub-143cbf8a3b5c4841983236dc7b36dab8.r2.dev/data.json"

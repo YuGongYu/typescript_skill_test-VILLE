@@ -13,7 +13,7 @@ A high-performance analytics app that visualizes market sentiment for Finnish la
 
 - **Next.js 15** with Static Site Generation
 - **React 19**, TypeScript, Tailwind CSS
-- Deployed to **Cloudflare Pages** via `@cloudflare/next-on-pages`
+- Deployed to **Cloudflare Pages**
 
 ## Architecture
 
@@ -42,31 +42,27 @@ Open `http://localhost:3000`
 Set `NEXT_PUBLIC_ANSWERS_DATA_URL` to your R2 data source:
 
 ```bash
-NEXT_PUBLIC_ANSWERS_DATA_URL=https://pub-143cbf8a3b5c4841983236dc7b36dab8.r2.dev/data.json.gz
+NEXT_PUBLIC_ANSWERS_DATA_URL=https://pub-143cbf8a3b5c4841983236dc7b36dab8.r2.dev/data.json
 ```
 
 For local dev, create `.env.local`. For production, set in `wrangler.toml` or Cloudflare dashboard.
 
 ## Scripts
 
-**Development:**
 - `npm run dev` - Next.js dev server
-- `npm run build` - Build with SSG
-
-**Cloudflare Pages:**
-- `npm run pages:build` - Build for Cloudflare
-- `npm run pages:deploy` - Build and deploy
+- `npm run build` - Build static site (outputs to `out/`)
+- `npm run deploy` - Build and deploy to Cloudflare Pages
 
 ## Deployment
 
 ### Via CLI:
 ```bash
-npm run pages:deploy
+npm run deploy
 ```
 
 ### Cloudflare Dashboard:
-- **Build command:** `npm run pages:build`
-- **Output directory:** `.vercel/output/static`
+- **Build command:** `npm run build`
+- **Output directory:** `out`
 - **Environment variable:** `NEXT_PUBLIC_ANSWERS_DATA_URL`
 
 **Live URL:** https://inderes.pages.dev

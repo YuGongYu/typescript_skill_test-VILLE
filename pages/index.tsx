@@ -13,6 +13,7 @@ import {
   deriveCompaniesFromAnswers,
   computeTopCompanies,
   getSectorNameForCompany,
+  fetchAnswersData,
 } from "../lib/utils";
 
 // Optional mapping from company.tid to human-friendly sector names.
@@ -31,13 +32,7 @@ interface HomeProps {
 // Static Site Generation - runs at build time
 export const getStaticProps: GetStaticProps<HomeProps> = async () => {
   try {
-    const dataUrl = process.env.NEXT_PUBLIC_ANSWERS_DATA_URL || 
-      'https://pub-143cbf8a3b5c4841983236dc7b36dab8.r2.dev/data.json.gz';
-    
-    const res = await fetch(dataUrl);
-    if (!res.ok) throw new Error("Failed to load dataset");
-    
-    const allAnswers: Answer[] = await res.json();
+    const allAnswers: Answer[] = await fetchAnswersData();
     const companies = deriveCompaniesFromAnswers(allAnswers);
     const sentimentSeries = buildDailySentimentSeries(allAnswers);
     const topCompanies = computeTopCompanies(companies, allAnswers);

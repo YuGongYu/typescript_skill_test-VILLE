@@ -4,7 +4,7 @@ import type { Answer, Company, SentimentPoint, AttributeStat } from "../../lib/t
 import AttributeRadarChart from "../../components/AttributeRadarChart";
 import HistoricalTrendsChart from "../../components/HistoricalTrendsChart";
 import type { GetStaticProps, GetStaticPaths } from "next";
-import { buildDailySentimentSeries } from "../../lib/utils";
+import { buildDailySentimentSeries, fetchAnswersData } from "../../lib/utils";
 
 interface CompanyProfileProps {
   company: Company;
@@ -15,13 +15,7 @@ interface CompanyProfileProps {
 // Generate all company pages at build time
 export const getStaticPaths: GetStaticPaths = async () => {
   try {
-    const dataUrl = process.env.NEXT_PUBLIC_ANSWERS_DATA_URL || 
-      'https://pub-143cbf8a3b5c4841983236dc7b36dab8.r2.dev/data.json.gz';
-    
-    const res = await fetch(dataUrl);
-    if (!res.ok) throw new Error('Failed to fetch');
-    
-    const allAnswers: Answer[] = await res.json();
+    const allAnswers: Answer[] = await fetchAnswersData();
     
     // Get unique ISINs
     const isins = [...new Set(allAnswers.map(a => a.company.isin))];
@@ -44,13 +38,7 @@ export const getStaticProps: GetStaticProps<CompanyProfileProps> = async (contex
   const isin = context.params?.isin as string;
   
   try {
-    const dataUrl = process.env.NEXT_PUBLIC_ANSWERS_DATA_URL || 
-      'https://pub-143cbf8a3b5c4841983236dc7b36dab8.r2.dev/data.json.gz';
-    
-    const res = await fetch(dataUrl);
-    if (!res.ok) throw new Error('Failed to fetch');
-    
-    const allAnswers: Answer[] = await res.json();
+    const allAnswers: Answer[] = await fetchAnswersData();
     const answers = allAnswers.filter(a => a.company.isin === isin);
     const company = answers[0]?.company;
     
