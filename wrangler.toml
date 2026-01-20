@@ -7,4 +7,4 @@ pages_build_output_dir = ".vercel/output/static"
 
 [vars]
 NEXT_ON_PAGES = "1"
-NEXT_PUBLIC_ANSWERS_DATA_URL = "https://pub-aabfd900efaf4039995d56f686bb2c79.r2.dev/data.json.gz"
+NEXT_PUBLIC_ANSWERS_DATA_URL = "https://pub-143cbf8a3b5c4841983236dc7b36dab8.r2.dev/data.json.gz"

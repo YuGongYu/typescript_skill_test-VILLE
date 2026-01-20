@@ -42,7 +42,7 @@ Open `http://localhost:3000`
 Set `NEXT_PUBLIC_ANSWERS_DATA_URL` to your R2 data source:
 
 ```bash
-NEXT_PUBLIC_ANSWERS_DATA_URL=https://pub-aabfd900efaf4039995d56f686bb2c79.r2.dev/data.json.gz
+NEXT_PUBLIC_ANSWERS_DATA_URL=https://pub-143cbf8a3b5c4841983236dc7b36dab8.r2.dev/data.json.gz
 ```
 
 For local dev, create `.env.local`. For production, set in `wrangler.toml` or Cloudflare dashboard.

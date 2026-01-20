@@ -16,7 +16,7 @@ interface CompanyProfileProps {
 export const getStaticPaths: GetStaticPaths = async () => {
   try {
     const dataUrl = process.env.NEXT_PUBLIC_ANSWERS_DATA_URL || 
-      'https://pub-aabfd900efaf4039995d56f686bb2c79.r2.dev/data.json.gz';
+      'https://pub-143cbf8a3b5c4841983236dc7b36dab8.r2.dev/data.json.gz';
     
     const res = await fetch(dataUrl);
     if (!res.ok) throw new Error('Failed to fetch');
@@ -45,7 +45,7 @@ export const getStaticProps: GetStaticProps<CompanyProfileProps> = async (contex
   
   try {
     const dataUrl = process.env.NEXT_PUBLIC_ANSWERS_DATA_URL || 
-      'https://pub-aabfd900efaf4039995d56f686bb2c79.r2.dev/data.json.gz';
+      'https://pub-143cbf8a3b5c4841983236dc7b36dab8.r2.dev/data.json.gz';
     
     const res = await fetch(dataUrl);
     if (!res.ok) throw new Error('Failed to fetch');
